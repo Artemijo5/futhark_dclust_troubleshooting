@@ -131,7 +131,7 @@ module dclust
 		-- cell id for every point
 		let pids = indices part_sz
 			|> expand (\pid -> part_sz[pid]) (\pid _ -> pid)
-			|> sized np
+			|> sized n
 		-- adjacent cell pairs
 		let part_pairs = get_adj_partitions bidir subdiv part_sz
 		-- #adjacent cells in part_pairs per cell
