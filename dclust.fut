@@ -118,7 +118,7 @@ module dclust
 	-- 3. pairs of neighbouring partitions
 	-- 4. #pairs per partition
 	-- 5. index of each partition's segment in 3
-	def partition_information [np] [n]
+	def get_partition_info [np] [n]
 		(bidir : bool)
 		(subdiv : [V.length]i64)
 		(part_is     : [np]i64)
@@ -348,5 +348,4 @@ module dclust
 			-- scatter the results of this window to cid
 			in scatter cid scatter_is cur_cid[inf:sup]
 		in final_cid
-
 }

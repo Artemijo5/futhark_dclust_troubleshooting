@@ -48,9 +48,6 @@ def bucket_sort [n] 't
 
 import "lib/github.com/athas/vector/vector"
 
--- | Module for 2-dimensional vectors.
-module vector_2 = cat_vector vector_1 vector_1
-
 -- | Module type for distance computations.
 module type distance = {
 	type t
@@ -86,6 +83,3 @@ module euclidean_dist (V : vector) (F : real)
 	def check_neighbourhood eps pt1 pt2 =
 		(dist pt1 pt2) `leq` eps
 }
-
--- | Euclidean distance module for 2d points of f64 values.
-module eucl2_f64 = euclidean_dist vector_2 f64
