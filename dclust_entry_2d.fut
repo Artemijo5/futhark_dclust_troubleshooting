@@ -18,13 +18,13 @@ import "lib/github.com/athas/vector/vector"
 --  1. dat  <- index_dataset_2d_f64 eps subdiv xs ys
 --  2. info <- get_part_info_2d_f64 false dat
 --  3. neigh_counts <- get_neighbour_counts_2d_f64 seed_count eps dat info
---  4. is_core      <- get_is_core minPts neigh_counts
+--  4. is_core      <- get_is_core_2d_f64 minPts neigh_counts
 --  5. cores     <- isolate_core_pts_2d_f64 is_core dat info
 --  6. core_info <- get_part_core_info_2d_f64 cores dat
 --  7. core_cids <- mk_clusters_2d_f64 seed_count eps info cores core_info
 --  8. info_bd <- get_part_info_2d_f64 true dat
 --  9. cluster_id <- assign_cluster_ids_2d_f64 seed_count eps dat info_bd cores core_info core_cids
--- 10. res <- deindex_results dat is_core cluster_id
+-- 10. res <- deindex_results_2d_f64 dat is_core cluster_id
 --
 -- It is recommended to sync futhark context between steps.
 
