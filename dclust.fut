@@ -173,20 +173,180 @@ module dclust
 						let pid1 = pids[i1]
 						let pid1_pairs_i = part_pairs_is[pid1]
 						let index_in_pairs = pid1_pairs_i + ind
-						let pid2 = part_pairs[index_in_pairs].1
+						let pid2 = (part_pairs[index_in_pairs]).1
 						in (i1,pid2)
 					)
 				-- expand every ajacent cell to its points
 				|> expand (\(_,pid2) -> part_sz[pid2])
-					(\(i1,pid2) ind -> (i1, part_is[pid2] + ind))
+					(\(i1,pid2) ind ->
+						let i2 = part_is[pid2] + ind
+						in (i1,i2)
+					)
 				-- filter out i1>=i2
 				|> filter (\(i1,i2) -> i1<i2)
 				-- check epsilon neighbourhood
 				|> filter (\(i1,i2) -> D.check_neighbourhood eps pts[i1] pts[i2])
 				|> unzip
-			in if (length cur_mins == 0) then neigh_count else
 			-- each instance of i1 in cur_mins or cur_maxs adds 1 to neigh_count[i1]
-			reduce_by_index neigh_count (+) 0 cur_mins (cur_mins |> map (\_ -> 1i64))
+			in reduce_by_index neigh_count (+) 0 cur_mins (cur_mins |> map (\_ -> 1i64))
 				|> map2 (+) (hist (+) 0 n cur_maxs (cur_maxs |> map (\_ -> 1i64)))
 		in final_neigh_count
+
+	-- | Create boolean flags for core pts.
+	def get_is_core [n]
+		(minPts : i64)
+		(neigh_count : [n]i64)
+	: [n]bool = neigh_count |> map (\nc -> nc >= minPts)
+
+	-- | Isolate core pts, as well as their pids.
+	-- Returns:
+	-- 1. the core points themselves
+	-- 2. pids of the core points
+	-- 3. indices of all core points
+	-- 4. indices of all non-core points
+	def isolate_core_pts [n]
+		(pts  : [n](vector t))
+		(pids : [n]i64)
+		(is_core : [n]bool)
+	: ([](vector t), []i64, []i64, []i64) =
+		let (core_is, non_core_is) = iota n
+			|> partition (\i -> is_core[i])
+		let (core_pts, core_pids) = core_is
+			|> map (\i -> (pts[i], pids[i]))
+			|> unzip
+		in (core_pts, core_pids, core_is, non_core_is)
+
+	-- | Get partition information regarding core pts only:
+	-- 1. number of core pts per partition.
+	-- 2. first index of each partition in isolated core pts.
+	def get_part_core_info [np] [n]
+		(_ : [np]i64) -- part_is
+		(core_pids : [n]i64)
+	: ([np]i64, [np]i64) =
+		let part_core_sz = hist (+) 0 np core_pids (replicate n 1i64)
+		let part_core_is = part_core_sz |> exscan (+) 0
+		in (part_core_sz, part_core_is)
+
+	-- | Find the clusters among core points.
+	def mk_clusters [n] [np]
+		(seed_count : i64)
+		(eps : t)
+		(core_pts  : [n](vector t))
+		(core_pids : [n]i64)
+		(part_pairs : [](i64,i64))
+		(part_core_is : [np]i64)
+		(part_core_sz : [np]i64)
+		(part_pairs_is : [np]i64)
+		(part_pairs_sz : [np]i64)
+	: [n]i64 =
+		-- each node starts with itself as its cluster id
+		let init_cid = iota n
+		let num_iter = (n + seed_count - 1) / seed_count
+		let final_cid = loop cid = init_cid
+		for j < num_iter do
+			let inf = j*seed_count
+			let sup = i64.min n (inf + seed_count)
+			let cur_pairs = (inf..<sup)
+				-- expand to adjacent cells
+				|> expand (\i1 ->
+						let pid1 = core_pids[i1]
+						in part_pairs_sz[pid1]
+					)
+					(\i1 ind ->
+						let pid1 = core_pids[i1]
+						let pid1_pairs_i = part_pairs_is[pid1]
+						let index_in_pairs = pid1_pairs_i + ind
+						let pid2 = (part_pairs[index_in_pairs]).1
+						in (i1,pid2)
+					)
+				-- expand to adjacent cells' points
+				|> expand (\(_,pid2) -> part_core_sz[pid2])
+					(\(i1,pid2) ind ->
+						let i2 = part_core_is[pid2] + ind
+						in (i1,i2)
+					)
+				-- filter out i1>=i2
+				|> filter (\(i1,i2) -> i1<i2)
+				-- keep only neighbour pairs
+				|> filter (\(i1,i2) ->
+					D.check_neighbourhood eps core_pts[i1] core_pts[i2]
+				)
+			-- use BFS to find connected subgraphs from current set
+			let current_clusts_base = get_connected_subgraph_ids n cur_pairs
+			in if j==0 then current_clusts_base else
+			-- keep pts before this window as they were
+			let current_clusts = iota n
+				|> map (\i -> if i<inf then cid[i] else current_clusts_base[i])
+			-- find collisions
+			let collisions = zip cid current_clusts
+				|> filter (\(alt,neu) -> alt != neu)
+				|> map (\(i1,i2) -> (i64.min i1 i2, i64.max i1 i2))
+			-- BFS among collided clusters to resolve collisions
+			-- cluster id i will be resolved to resolutions[i]
+			let resolutions = get_connected_subgraph_ids n collisions
+			in current_clusts |> map (\i -> resolutions[i])
+		-- make clusters compact
+		in final_cid |> encode_subgraph_ids
+
+	-- | Assign cluster id's to all points.
+	-- For core-points, only scattering is needed.
+	-- For non-core points, find core points within their neighbourhood and use their largest id.
+	def assign_cluster_ids [n] [n_core] [n_noncore] [np]
+		(seed_count : i64)
+		(eps : t)
+		(pts  : [n](vector t))
+		(pids : [n]i64)
+		(core_pts : [n_core](vector t))
+		(core_cid : [n_core]i64)
+		(core_is    : [n_core]i64)
+		(noncore_is : [n_noncore]i64)
+		(part_pairs_bidir : [](i64,i64))
+		(part_core_is : [np]i64)
+		(part_core_sz : [np]i64)
+		(part_pairs_is_bd : [np]i64)
+		(part_pairs_sz_bd : [np]i64)
+	: [n]i64 =
+		-- Init cid include core pts'
+		let init_cid = scatter (replicate n (-1)) core_is core_cid
+		let num_iter = (n_noncore + seed_count - 1) / seed_count
+		let final_cid = loop cid = init_cid
+		for j<num_iter do
+			let inf = j*seed_count
+			let sup = i64.min n_noncore (inf + seed_count)
+			-- Find all candidate cluster id's for current points
+			let (window_is, cur_candidate_cids)
+			= (inf..<sup)
+				-- map loop index to non-core point index
+				-- but also maintain its loop index as og_i1
+				|> map (\i1 -> (i1, noncore_is[i1]))
+				-- expand to neighbouring cells
+				|> expand (\(_,i1) ->
+						let pid1 = pids[i1]
+						in part_pairs_sz_bd[pid1]
+					)
+					(\(og_i1,i1) ind ->
+						let pid1 = pids[i1]
+						let pid1_pairs_i = part_pairs_is_bd[pid1]
+						let index_in_pairs = pid1_pairs_i + ind
+						let pid2 = (part_pairs_bidir[index_in_pairs]).1
+						in (og_i1,i1,pid2)
+					)
+				-- expand neighbouring cells to their points
+				|> expand (\(_,_,pid2) -> part_core_sz[pid2])
+					(\(og_i1,i1,pid2) ind ->
+						let i2 = part_core_is[pid2] + ind
+						in (og_i1,i1,i2)
+					)
+				-- filter where pts[i1] is neighbours with core_pts[i2]
+				|> filter (\(_,i1,i2) -> D.check_neighbourhood eps pts[i1] core_pts[i2])
+				-- change i2 to its found cluster id
+				|> map (\(og_i1,_,i2) -> (og_i1,core_cid[i2]))
+				|> unzip
+			-- use hist to assign one cid to each point in the window
+			let cur_cid = hist (i64.max) (-1) n_noncore window_is cur_candidate_cids
+			let scatter_is = (inf..<sup) |> map (\i -> noncore_is[i])
+			-- scatter the results of this window to cid
+			in scatter cid scatter_is cur_cid[inf:sup]
+		in final_cid
+
 }
