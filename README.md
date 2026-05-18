@@ -14,4 +14,4 @@ For eps = 0.008, minPts = 8, it should find 398623 core points, 44 clusters (45 
 How to use:
 1. have futhark installed, make sure you can use the c & cuda backends.
 2. `futhark pkg sync`
-3. The tests in `tests/` directory can be checked with `futhark test --backend=cuda <name_of_file>`, or for sequential execution `futhark test --backend=c <name_of_file>`. The tests in `tests/modular/` can be run by calling `bash ./run.sh --backend=cuda` or `bash ./run.sh --backend=c` while in that directory.
+3. The tests in `tests/` directory can be checked with `futhark test --backend=cuda <name_of_file>`, or for sequential execution `futhark test --backend=c <name_of_file>`. The tests in `tests/modular/` can be run by calling `bash ./run.sh cuda` or `bash ./run.sh c` while in that directory.
