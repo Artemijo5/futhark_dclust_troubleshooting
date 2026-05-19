@@ -23,6 +23,10 @@ def get_connected_subgraph_ids
 	(k : i64)
 	(pairs : [](i64,i64))
 : [k]i64 =
+	-- TODO tmp code to skip this function
+	if true then
+		hist (i64.min) (i64.highest) k (pairs |> map (.1)) (pairs |> map (.0))
+		else
 	let (mins,maxs) = unzip pairs
 	let (_,g_ids) =
 	-- In each iteration, node k asks itself & its neihbours
