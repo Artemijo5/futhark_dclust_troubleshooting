@@ -276,12 +276,13 @@ module dclust
 			-- keep pts before this window as they were
 			let current_clusts = iota n
 				|> map (\i -> if i<inf then cid[i] else current_clusts_base[i])
-			-- find & resolve collisions
+			-- find collisions
 			let collisions = zip cid current_clusts
 				|> filter (\(alt,neu) -> alt != neu)
 				|> map (\(i1,i2) -> (i64.min i1 i2, i64.max i1 i2))
-			let resolutions = get_connected_subgraph_ids
-				n collisions
+			-- BFS among collided clusters to resolve collisions
+			-- cluster id i will be resolved to resolutions[i]
+			let resolutions = get_connected_subgraph_ids n collisions
 			in current_clusts |> map (\i -> resolutions[i])
 		-- make clusters compact
 		in final_cid |> encode_subgraph_ids
