@@ -2,6 +2,7 @@ import "basics"
 import "spatial_index"
 import "bfs"
 import "dclust"
+--import "dclust_alt"
 
 import "lib/github.com/athas/vector/vector"
 
