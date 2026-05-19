@@ -129,9 +129,8 @@ module dclust
 			|> map (\i -> if i==np-1 then n else part_is[i+1])
 			|> map2 (\i1 i2 -> i2 - i1) part_is
 		-- cell id for every point
-		let pids = indices part_sz
-			|> expand (\pid -> part_sz[pid]) (\pid _ -> pid)
-			|> sized n
+		let pids = scatter (replicate n (-1)) part_is (indices part_is)
+			|> scan (i64.max) (-1)
 		-- adjacent cell pairs
 		let part_pairs = get_adj_partitions bidir subdiv part_sz
 		-- #adjacent cells in part_pairs per cell
