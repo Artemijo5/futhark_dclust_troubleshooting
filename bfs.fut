@@ -6,8 +6,6 @@
 -- In each iteration, each point looks for the smallest index any of its neighbours have found,
 -- until convergence.
 
-
-
 -- | Assign the same id to points belonging to the same connected subgraph.
 -- The undirected graph is represented as an array of unique index pairs (i1,i2), i1<=i2.
 -- A subraph's id is the smallest index of its elements.
@@ -19,16 +17,12 @@
 -- pairs : undirected graph
 -- Returns:
 -- a k-sized array with the subgraph id of each node
-def get_connected_subgraph_ids
+def get_connected_subgraph_ids [n]
 	(k : i64)
-	(pairs : [](i64,i64))
+	(pairs : [n](i64,i64))
 : [k]i64 =
-	-- TODO tmp code to skip this function
-	if true then
-		hist (i64.min) (i64.highest) k (pairs |> map (.1)) (pairs |> map (.0))
-		else
 	let (mins,maxs) = unzip pairs
-	let (_,g_ids) =
+	let (_,g_ids,_) =
 	-- In each iteration, node k asks itself & its neihbours
 	-- for the minimum-indexed node they currently 'see',
 	-- until convergence.
@@ -38,15 +32,15 @@ def get_connected_subgraph_ids
 	-- if the entire graph is a line with only 2 edges per node excluding the extremes.
 	--
 	-- In general, span = O(length of the largest path to the min node in any connected subgraph).
-	loop (old_mins, new_mins) = (replicate k (-1), iota k)
-	while (any (id) (map2 (!=) old_mins new_mins)) do
+	loop (old_mins, new_mins, iter) = (replicate k (-1), iota k, 0)
+	while (any (id) (map2 (!=) old_mins new_mins) && iter < n) do
 		let mins_from_mins = mins |> map (\i -> new_mins[i])
 		let mins_from_maxs = maxs |> map (\i -> new_mins[i])
 		let pivots_from_maxs = reduce_by_index (copy new_mins)
 			(i64.min) i64.highest mins mins_from_maxs
 		let pivots_from_mins = reduce_by_index pivots_from_maxs
 			(i64.min) i64.highest maxs mins_from_mins
-		in (new_mins, pivots_from_mins)
+		in (new_mins, pivots_from_mins,iter+1)
 	in g_ids
 
 import "basics"

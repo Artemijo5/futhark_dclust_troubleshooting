@@ -280,7 +280,7 @@ module dclust
 			let collisions = zip cid current_clusts
 				|> filter (\(alt,neu) -> alt != neu)
 				|> map (\(i1,i2) -> (i64.min i1 i2, i64.max i1 i2))
-			let resolutions = get_connected_subgraph_ids_from_unique
+			let resolutions = get_connected_subgraph_ids
 				n collisions
 			in current_clusts |> map (\i -> resolutions[i])
 		-- make clusters compact
