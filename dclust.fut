@@ -277,12 +277,24 @@ module dclust
 			let current_clusts = iota n
 				|> map (\i -> if i<inf then cid[i] else current_clusts_base[i])
 			-- find collisions
-			let collisions = zip cid current_clusts
+			let collisions_unsorted = zip cid current_clusts
 				|> filter (\(alt,neu) -> alt != neu)
 				|> map (\(i1,i2) -> (i64.min i1 i2, i64.max i1 i2))
-			-- BFS among collided clusters to resolve collisions
-			-- cluster id i will be resolved to resolutions[i]
-			let resolutions = get_connected_subgraph_ids n collisions
+			let collisions_buckets = collisions_unsorted
+				|> map (.1)
+				|> i64.maximum |> (i64.+) 1
+			-- Resolv
+			let collisions = collisions_unsorted
+				|> bucket_sort 2 collisions_buckets (collisions_unsorted |> map (.1))
+				|> (.1)
+				|> bucket_sort 2 collisions_buckets (collisions_unsorted |> map (.0))
+				|> (.1)
+			let collisions_unique = collisions
+				|> group_boundaries (!=)
+				|> zip collisions
+				|> filter (.1)
+				|> map (.0)
+			let resolutions = get_connected_subgraph_ids n collisions_unique
 			in current_clusts |> map (\i -> resolutions[i])
 		-- make clusters compact
 		in final_cid |> encode_subgraph_ids
