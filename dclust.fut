@@ -304,38 +304,69 @@ module dclust
 		(part_core_sz : [np]i64)
 		(part_pairs_is_bd : [np]i64)
 		(part_pairs_sz_bd : [np]i64)
-	: [n]i64 =
+	: [n]i64 =	
 		-- Init cid include core pts'
 		let init_cid = scatter (replicate n (-1)) core_is core_cid
 		let num_iter = (n_noncore + seed_count - 1) / seed_count
+		-- Calculate per-point load by pid
+		let pair_load = part_pairs_bidir
+			|> map (\(_,pid2) -> part_core_sz[pid2])
+		let load_by_pid = hist (+) 0 np (part_pairs_bidir |> map (.0)) pair_load
+		let prefix_load_by_pid = exscan (+) 0 load_by_pid
+		-- improvised segmented prefix load of pid2 in pairs
+		let pair_prefix_load = pair_load
+			|> scan (+) 0
+			|> zip3
+				(part_pairs_bidir |> map (.0) |> map (\i -> prefix_load_by_pid[i]))
+				pair_load
+			|> map (\(pid1_pref,load2,acc_load) -> acc_load - pid1_pref - load2)
+		let load_by_pid = hist (+) 0 np (part_pairs_bidir |> map (.0)) pair_load
 		let final_cid = loop cid = init_cid
 		for j<num_iter do
 			let inf = j*seed_count
 			let sup = i64.min n_noncore (inf + seed_count)
+			-- Pre-calc array sizes
+			let current_loads = (inf..<sup)
+				|> map (\i1 -> noncore_is[i1])
+				|> map (\i1 -> pids[i1])
+				|> map (\pid1 -> load_by_pid[pid1])
+			let prefix_load = exscan (+) 0 current_loads
+			let total_load = reduce (+) 0 current_loads
+			-- "Expand" window with binary search
+			let pre_expanded_window = iota total_load
+				|> bsearch_last (>=) (<)
+					(replicate total_load 0)
+					(replicate total_load (sup-inf))
+					prefix_load
+				|> zip (iota total_load)
+				|> map (\(ind,i1) -> (i1, ind - prefix_load[i1]))
+				|> map (\(og_i1,ind) -> (og_i1,noncore_is[og_i1],ind))
+			-- Get which partition & what point of that partition to compare in each thread
+			let (bsearch_inf, bsearch_sup, expanded_ind) = pre_expanded_window
+				|> map (\(_,i1,ind) -> (pids[i1],ind))
+				|> map (\(pid1,ind) ->
+					let pid1_inf = part_pairs_is_bd[pid1]
+					let pid1_sup = pid1_inf + part_pairs_sz_bd[pid1]
+					in (pid1_inf,pid1_sup,ind)
+				)
+				|> unzip3
+			let expanded_pid2_ind = expanded_ind
+				|> bsearch_last (>=) (<)
+					bsearch_inf
+					bsearch_sup
+					pair_prefix_load
+			let expanded_pid2 = expanded_pid2_ind
+				|> map (\pid2_ind -> (part_pairs_bidir[pid2_ind]).1)
+			let expanded_i2 = zip expanded_ind expanded_pid2_ind
+				|> map (\(ind,pid2_ind) -> ind - pair_prefix_load[pid2_ind])
+				|> zip expanded_pid2
+				|> map (\(pid2,ind2) -> part_core_is[pid2] + ind2)
+			-- Final expanded window
+			let expanded_window = zip pre_expanded_window expanded_i2
+				|> map (\((og_i1,i1,_),i2) -> (og_i1,i1,i2))
 			-- Find all candidate cluster id's for current points
 			let (window_is, cur_candidate_cids)
-			= (inf..<sup)
-				-- map loop index to non-core point index
-				-- but also maintain its loop index as og_i1
-				|> map (\i1 -> (i1, noncore_is[i1]))
-				-- expand to neighbouring cells
-				|> expand (\(_,i1) ->
-						let pid1 = pids[i1]
-						in part_pairs_sz_bd[pid1]
-					)
-					(\(og_i1,i1) ind ->
-						let pid1 = pids[i1]
-						let pid1_pairs_i = part_pairs_is_bd[pid1]
-						let index_in_pairs = pid1_pairs_i + ind
-						let pid2 = (part_pairs_bidir[index_in_pairs]).1
-						in (og_i1,i1,pid2)
-					)
-				-- expand neighbouring cells to their points
-				|> expand (\(_,_,pid2) -> part_core_sz[pid2])
-					(\(og_i1,i1,pid2) ind ->
-						let i2 = part_core_is[pid2] + ind
-						in (og_i1,i1,i2)
-					)
+			= expanded_window
 				-- filter where pts[i1] is neighbours with core_pts[i2]
 				|> filter (\(_,i1,i2) -> D.check_neighbourhood eps pts[i1] core_pts[i2])
 				-- change i2 to its found cluster id
