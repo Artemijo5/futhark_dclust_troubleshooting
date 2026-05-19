@@ -33,14 +33,16 @@ def get_connected_subgraph_ids [n]
 	--
 	-- In general, span = O(length of the largest path to the min node in any connected subgraph).
 	loop (old_mins, new_mins, iter) = (replicate k (-1), iota k, 0)
-	while (any (id) (map2 (!=) old_mins new_mins) && iter < n) do
+	while ((any (id) (map2 (!=) old_mins new_mins))) do
 		let mins_from_mins = mins |> map (\i -> new_mins[i])
 		let mins_from_maxs = maxs |> map (\i -> new_mins[i])
-		let pivots_from_maxs = reduce_by_index (copy new_mins)
-			(i64.min) i64.highest mins mins_from_maxs
-		let pivots_from_mins = reduce_by_index pivots_from_maxs
-			(i64.min) i64.highest maxs mins_from_mins
-		in (new_mins, pivots_from_mins,iter+1)
+		let pivots_from_maxs = hist (i64.min) i64.highest k
+			mins mins_from_maxs
+		let pivots_from_mins = hist (i64.min) i64.highest k
+			maxs mins_from_mins
+		let pivots_final = map3 (\p1 p2 p3 -> i64.min (i64.min p1 p2) p3)
+			pivots_from_mins pivots_from_maxs new_mins
+		in (new_mins, pivots_final,iter+1)
 	in g_ids
 
 import "basics"
