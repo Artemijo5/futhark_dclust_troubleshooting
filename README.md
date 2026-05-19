@@ -12,8 +12,12 @@ For eps = 0.008, minPts = 8, it should find 398623 core points, 44 clusters (45 
 ---
 
 Current status:
-- changed some code to use binary searches instead of segmented parallelism. This seemingly "fixes" every get_partition_info and assign_cluster_id, except the latter seemingly fails for some of the small_test's (but not for 2D_spatial_network...). Original code is preserved in `dclust_alt.fut`, and can be tested by importing that instead of `dclust` in dclust_entry_2d.fut. TODO Might change other routines to use this logic as well?
+- changed some code to use binary searches instead of segmented parallelism. This seemingly "fixes" every `get_partition_info` and `assign_cluster_id`, except the latter seemingly fails for some of the small_test's (but not for 2D_spatial_network...). Original code is preserved in `dclust_alt.fut`, and can be tested by importing that instead of `dclust` in dclust_entry_2d.fut. TODO Might change other routines to use this logic as well?
 - the BFS loop causes the test for `mk_clusters` to time out, even though that was not happening in C API execution... TODO see how current code does in C API...
+
+So it's evident that
+1. something is going on with segmented scans that ruins `assign_cluster_id` and pids expansion for cuda backend. Probably need to report.
+2. either something new appeared with the BFS, or `futhark test` doesn't like it for some reason...
 
 ---
 
