@@ -83,3 +83,32 @@ module euclidean_dist (V : vector) (F : real)
 	def check_neighbourhood eps pt1 pt2 =
 		(dist pt1 pt2) `leq` eps
 }
+
+-- | Bulk binary search to locate the last matching element.
+--
+-- If no match exists, outputs index of largest element smaller than v.
+-- If no smaller element exists, outputs (-1).
+-- Also outputs (-1) if the initial index < 0.
+--
+-- Note: vs are on the left side of all comparisons.
+def bsearch_last [nvs] [n] 't
+	(geq: t -> t -> bool)
+	(lt : t -> t -> bool)
+	(min_is : [nvs]i64)
+	(max_is : [nvs]i64) -- exclusive
+	(xs : [n]t)
+	(vs : [nvs]t)
+: [nvs]i64 = vs |> map3 (\i_min i_max v ->
+	let (found_at,_) = loop (i, last_step) = (i_min, i_max-i_min)
+	while i>=0 && i>=i_min && i<i_max &&
+		!( (v `geq` xs[i]) && ( i==(i_max-1) || (v `lt` xs[i+1]) ) )
+	do
+		-- check for kv>=cv && kv<nv is done in loop conditions
+		-- so inside loop assume that isn't the case
+		let this_step = (last_step+1)/2 in
+		if (v `lt` xs[i]) then
+			(i64.max i_min (i-this_step), this_step)
+		else
+			(i64.min (i_max-1) (i+this_step), this_step)
+	in found_at
+) min_is max_is
