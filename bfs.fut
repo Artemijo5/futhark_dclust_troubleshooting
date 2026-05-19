@@ -47,6 +47,25 @@ def get_connected_subgraph_ids
 
 import "basics"
 
+-- | Wrapper for get_connected_subgraph_ids that first makes pairs unique.
+def get_connected_subgraph_ids_from_unique
+	(k : i64)
+	(pairs : [](i64,i64))
+: [k]i64 =
+	let num_buckets = 1 + (pairs |> map (.1) |> i64.maximum)
+	let pairs1 = pairs
+		|> bucket_sort 2 num_buckets (pairs |> map (.1))
+		|> (.1)
+	let pairs2 = pairs1
+		|> bucket_sort 2 num_buckets (pairs1 |> map (.0))
+		|> (.1)
+	let pairs_unique = pairs2
+		|> group_boundaries (\(x1,y1) (x2,y2) -> x1!=x2 || y1!=y2)
+		|> zip pairs2
+		|> filter (.1)
+		|> map (.0)
+	in get_connected_subgraph_ids k pairs_unique
+
 -- | Apply dictionary encoding to subgraph id's.
 def encode_subgraph_ids [k] (sg_ids : [k]i64) : [k]i64 =
 	let flags = iota k |> map2 (==) sg_ids
